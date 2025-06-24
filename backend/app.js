@@ -11,8 +11,9 @@ const app = express();
 const fileRoutes = require("./routes/fileRoutes"); // ✅ Declare only once
 
 // Middleware
+
 app.use(cors({
-  origin: "https://your-frontend-name.vercel.app"
+  origin: "*", // Allow requests from anywhere
 }));
 
 
