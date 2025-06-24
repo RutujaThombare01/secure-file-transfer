@@ -1,54 +1,45 @@
-import { useState } from "react";
-import axios from "axios";
+const express = require("express");
+const dotenv = require("dotenv");
+const cron = require("node-cron");
+const fs = require("fs");
+const path = require("path");
+const cors = require("cors");
 
-export default function UploadForm() {
-  const [file, setFile] = useState(null);
-  const [secureLink, setSecureLink] = useState("");
+dotenv.config();
+const app = express();
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-  };
-
-  const handleUpload = async () => {
-  if (!file) return alert("Please select a file first.");
-
-  const formData = new FormData();
-  formData.append("file", file); // key must be "file"
-
-  try {
-    const response = await axios.post("http://localhost:5000/api/files/upload", formData);
-    const link = response.data.accessLink;
-    setSecureLink(link);
-  } catch (error) {
-    console.error("Upload failed:", error);
-    alert("Upload failed: " + (error?.response?.data || error.message));
-  }
-};
-
-
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2>Secure File Upload</h2>
-      <input type="file" onChange={handleFileChange} />
-      <br /><br />
-      <button onClick={handleUpload}>Upload</button>
-      <br /><br />
-      {secureLink && (
-  <div>
-    <strong>Secure Link:</strong>
-    <p>
-      <a id="secureLink" href={secureLink} target="_blank" rel="noopener noreferrer">
-        {secureLink}
-      </a>
-    </p>
-    <button onClick={() => {
-      navigator.clipboard.writeText(secureLink)
-        .then(() => alert("✅ Link copied to clipboard"))
-        .catch(() => alert("❌ Failed to copy"));
-    }}>📋 Copy Link</button>
-  </div>
-)}
-
-    </div>
-  );
+// ✅ Create uploads folder before using it
+const UPLOADS_DIR = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  console.log("✅ uploads/ folder created");
 }
+
+// Middleware
+app.use(cors({ origin: process.env.CLIENT_DOMAIN }));
+app.use(express.json());
+
+// Serve uploaded files statically
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+// Routes
+const fileRoutes = require("./routes/fileRoutes");
+app.use("/api/files", fileRoutes);
+
+// 🕒 CRON job to delete expired files
+cron.schedule("* * * * *", () => {
+  fs.readdirSync(UPLOADS_DIR).forEach(file => {
+    const filePath = path.join(UPLOADS_DIR, file);
+    const stats = fs.statSync(filePath);
+    const age = (Date.now() - stats.ctimeMs) / 60000; // in minutes
+    if (age > parseInt(process.env.EXPIRE_MINUTES)) {
+      fs.unlinkSync(filePath);
+      console.log(`🗑️ Deleted expired file: ${file}`);
+    }
+  });
+});
+
+// Start server
+app.listen(process.env.PORT, () => {
+  console.log(`🚀 Server running on port ${process.env.PORT}`);
+});

@@ -8,7 +8,8 @@ export default function ViewDocument() {
   useEffect(() => {
     // Build the actual file URL from token
     if (token) {
-      setFileUrl(`http://localhost:5000/api/files/access/${token}`);
+      setFileUrl(`https://secure-file-transfer-1-o6ja.onrender.com/api/files/access/${token}`);
+
     }
   }, [token]);
 
