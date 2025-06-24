@@ -4,6 +4,8 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const fs = require("fs");
 const router = express.Router();
+const upload = require("../middlewares/upload"); // adjust path if needed
+
 
 ;
 
