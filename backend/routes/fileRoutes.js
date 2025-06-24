@@ -1,12 +1,21 @@
-// ✅ UPDATED: fileRoutes.js
 const express = require("express");
 const path = require("path");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
+const fs = require("fs");
 const router = express.Router();
 
-const UPLOADS_DIR = path.join(__dirname, "../uploads");
+;
 
+const UPLOADS_DIR = path.join(__dirname, "./uploads");
+
+// Create the directory if it doesn't exist
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  console.log("✅ uploads/ folder created");
+}
+
+// Multer storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, UPLOADS_DIR);
@@ -17,26 +26,34 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// ✅ Upload Route
 router.post("/upload", upload.single("file"), (req, res) => {
   try {
-    const file = req.file;
+    console.log("Upload API hit");
 
-    // Set token expiry to 60 seconds (1 minute)
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+
+    console.log("Received file:", file);
+
     const token = jwt.sign(
       { filename: file.filename },
       process.env.JWT_SECRET,
-      { expiresIn: "60s" }
+      { expiresIn: "60s" } // 1-minute expiration
     );
 
     const accessLink = `${process.env.CLIENT_DOMAIN}/view/${token}`;
-
     return res.json({ success: true, accessLink });
+
   } catch (err) {
-    console.error(err);
+    console.error("Error in upload route:", err);
     return res.status(500).json({ success: false, message: "Upload failed" });
   }
 });
 
+// ✅ File Access Route
 router.get("/access/:token", (req, res) => {
   try {
     const { token } = req.params;
@@ -44,8 +61,13 @@ router.get("/access/:token", (req, res) => {
     const filename = decoded.filename;
     const filePath = path.join(UPLOADS_DIR, filename);
 
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send("File not found or already deleted.");
+    }
+
     return res.sendFile(filePath);
   } catch (err) {
+    console.error("Access error:", err);
     return res.status(403).send("ForbiddenError: Invalid or Expired Link");
   }
 });
